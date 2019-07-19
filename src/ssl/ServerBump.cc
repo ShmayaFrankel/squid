@@ -75,3 +75,24 @@ Ssl::ServerBump::sslErrors() const
     return errs;
 }
 
+const char* BumpingStatesDescription[] =
+{
+    "None",
+    "Waiting-client-TLS-hello",
+    "Parsing-client-TLS-hello",
+    "Client-TLS-hello-parsed",
+    "Peek-client-evaluate",
+    "Peek-at-server",
+    "Generate-internal-TLS-structures",
+    "TLS-negotiate",
+    "TLS-established",
+    nullptr
+};
+
+const char *
+Ssl::BumpingStateStr(enum BumpingStates state)
+{
+    Must(state >= bumpStateNone);
+    Must(state <= bumpStateTlsEstablish);
+    return BumpingStatesDescription[state];
+}

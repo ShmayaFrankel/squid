@@ -58,6 +58,21 @@ private:
     store_client *sc; ///< dummy client to prevent entry trimming
 };
 
+enum BumpingStates: short
+{
+    bumpStateNone,
+    bumpStateExpectTlsHandshake, ///< Before the client hello message received.
+    bumpStateParsingTlsHandshake, ///< While parses the client hello message
+    bumpStateParsingDone, ///< The client hello message parsed
+    bumpStatePeekEvaluate, ///< After peeks at client, run step2 acls evaluate client handshake with openSSL
+    bumpStatePeekAtServer, ///< Wait the server side peeking procedure to be finished.
+    bumpStateGenerateContext, ///< While generates internal squid structures and generate certificates to establish TLS connection with client.
+    bumpStateTlsNegotiate, ///< TLS Negotiation with client
+    bumpStateTlsEstablish ///< The TLS connection established
+};
+
+const char *BumpingStateStr(enum BumpingStates state);
+
 } // namespace Ssl
 
 #endif

@@ -1953,7 +1953,7 @@ void
 ConnStateData::afterClientRead()
 {
 #if USE_OPENSSL
-    if (parsingTlsHandshake) {
+    if (parsingTlsHandshake()) {
         parseTlsHandshake();
         return;
     }
@@ -2144,8 +2144,13 @@ ConnStateData::requestTimeout(const CommTimeoutCbParams &io)
         Http::StreamPointer context = pipeline.front();
         Must(context && context->http);
         HttpRequest::Pointer request = context->http->request;
-        if (clientTunnelOnError(this, context, request, HttpRequestMethod(), ERR_REQUEST_START_TIMEOUT))
+        if (clientTunnelOnError(this, context, request, HttpRequestMethod(), ERR_REQUEST_START_TIMEOUT)) {
+#if USE_OPENSSL
+            if (bumpingState)
+                bumpingState = Ssl::bumpStateNone;
+#endif
             return;
+        }
     }
     /*
     * Just close the connection to not confuse browsers
@@ -2180,7 +2185,7 @@ ConnStateData::ConnStateData(const MasterXaction::Pointer &xact) :
     needProxyProtocolHeader_(false),
 #if USE_OPENSSL
     switchedToHttps_(false),
-    parsingTlsHandshake(false),
+    bumpingState(Ssl::bumpStateNone),
     tlsConnectPort(0),
     sslServerBump(NULL),
     signAlgorithm(Ssl::algSignTrusted),
@@ -2515,6 +2520,8 @@ clientNegotiateSSL(int fd, void *data)
     debugs(83, 2, "Client certificate requesting not yet implemented.");
 #endif
 
+    conn->tlsEstablished();
+
     conn->readSomeData();
 }
 
@@ -2807,6 +2814,7 @@ ConnStateData::storeTlsContextToCache(const SBuf &cacheKey, Security::ContextPoi
 void
 ConnStateData::getSslContextStart()
 {
+    bumpingState = Ssl::bumpStateGenerateContext;
     // If we are called, then CONNECT has succeeded. Finalize it.
     if (auto xact = pipeline.front()) {
         if (xact->http && xact->http->request && xact->http->request->method == Http::METHOD_CONNECT)
@@ -2904,6 +2912,7 @@ ConnStateData::getSslContextDone(Security::ContextPointer &ctx)
     commSetConnTimeout(clientConnection, Config.Timeout.request, timeoutCall);
 
     switchedToHttps_ = true;
+    bumpingState = Ssl::bumpStateTlsNegotiate;
 
     auto ssl = fd_table[clientConnection->fd].ssl.get();
     BIO *b = SSL_get_rbio(ssl);
@@ -2953,14 +2962,17 @@ ConnStateData::switchToHttps(ClientHttpRequest *http, Ssl::BumpMode bumpServerMo
     // a bumbed "connect" request on non transparent port.
     receivedFirstByte_ = false;
     // Get more data to peek at Tls
-    parsingTlsHandshake = true;
+    //parsingTlsHandshake = true;
+    bumpingState = Ssl::bumpStateExpectTlsHandshake;
     readSomeData();
 }
 
 void
 ConnStateData::parseTlsHandshake()
 {
-    Must(parsingTlsHandshake);
+    Must(parsingTlsHandshake());
+    if (bumpingState == Ssl::bumpStateExpectTlsHandshake)
+        bumpingState = Ssl::bumpStateParsingTlsHandshake;
 
     assert(!inBuf.isEmpty());
     receivedFirstByte();
@@ -2973,13 +2985,14 @@ ConnStateData::parseTlsHandshake()
             readSomeData();
             return;
         }
+        bumpingState = Ssl::bumpStateParsingDone;
     }
     catch (const std::exception &ex) {
         debugs(83, 2, "error on FD " << clientConnection->fd << ": " << ex.what());
         unsupportedProtocol = true;
     }
 
-    parsingTlsHandshake = false;
+    // parsingTlsHandshake = false;
 
     // client data may be needed for splicing and for
     // tunneling unsupportedProtocol after an error
@@ -3006,6 +3019,8 @@ ConnStateData::parseTlsHandshake()
         context->http->al->ssl.bumpMode = Ssl::bumpSplice;
         if (!clientTunnelOnError(this, context, request, HttpRequestMethod(), ERR_PROTOCOL_UNKNOWN))
             clientConnection->close();
+        else
+            bumpingState = Ssl::bumpStateNone;
         return;
     }
 
@@ -3015,6 +3030,7 @@ ConnStateData::parseTlsHandshake()
     } else if (sslServerBump->act.step1 == Ssl::bumpServerFirst) {
         Http::StreamPointer context = pipeline.front();
         ClientHttpRequest *http = context ? context->http : nullptr;
+        bumpingState = Ssl::bumpStatePeekAtServer;
         // will call httpsPeeked() with certificate and connection, eventually
         FwdState::Start(clientConnection, sslServerBump->entry, sslServerBump->request.getRaw(), http ? http->al : nullptr);
     } else {
@@ -3096,6 +3112,7 @@ ConnStateData::startPeekAndSplice()
     ClientHttpRequest *http = context ? context->http : nullptr;
 
     if (sslServerBump->step == Ssl::bumpStep1) {
+        bumpingState = Ssl::bumpStatePeekEvaluate;
         sslServerBump->step = Ssl::bumpStep2;
         // Run a accessList check to check if want to splice or continue bumping
 
@@ -3111,6 +3128,7 @@ ConnStateData::startPeekAndSplice()
         acl_checklist->nonBlockingCheck(httpsSslBumpStep2AccessCheckDone, this);
         return;
     }
+    assert(bumpingState == Ssl::bumpStatePeekEvaluate);
 
     // will call httpsPeeked() with certificate and connection, eventually
     Security::ContextPointer unConfiguredCTX(Ssl::createSSLContext(port->secure.signingCa.cert, port->secure.signingCa.pkey, port->secure));
@@ -3136,6 +3154,8 @@ ConnStateData::startPeekAndSplice()
         HttpRequest::Pointer request(http ? http->request : nullptr);
         if (!clientTunnelOnError(this, context, request, HttpRequestMethod(), ERR_SECURE_ACCEPT_FAIL))
             clientConnection->close();
+        else
+            bumpingState = Ssl::bumpStateNone;
         return;
     }
 
@@ -3143,6 +3163,7 @@ ConnStateData::startPeekAndSplice()
     // of SSL bump
     inBuf.clear();
 
+    bumpingState = Ssl::bumpStatePeekAtServer;
     debugs(83, 5, "Peek and splice at step2 done. Start forwarding the request!!! ");
     FwdState::Start(clientConnection, sslServerBump->entry, sslServerBump->request.getRaw(), http ? http->al : NULL);
 }
@@ -3160,6 +3181,7 @@ ConnStateData::doPeekAndSpliceStep()
 
     Comm::SetSelect(clientConnection->fd, COMM_SELECT_WRITE, clientNegotiateSSL, this, 0);
     switchedToHttps_ = true;
+    bumpingState = Ssl::bumpStateTlsNegotiate;
 }
 
 void
@@ -3176,6 +3198,20 @@ ConnStateData::httpsPeeked(PinnedIdleContext pic)
         debugs(33, 5, HERE << "Error while bumping: " << sslConnectHostOrIp);
 
     getSslContextStart();
+}
+
+inline bool
+ConnStateData::parsingTlsHandshake()
+{
+    return bumpingState == Ssl::bumpStateExpectTlsHandshake ||
+           bumpingState == Ssl::bumpStateParsingTlsHandshake;
+} ///< whether we are getting/parsing TLS Hello bytes
+
+inline void
+ConnStateData::tlsEstablished()
+{
+    if (bumpingState)
+        bumpingState = Ssl::bumpStateTlsEstablish;
 }
 
 #endif /* USE_OPENSSL */
@@ -3948,26 +3984,35 @@ ConnStateData::checkLogging()
     if (bodyPipe)
         return;
 
-    // a request currently using this connection is responsible for logging
-    if (!pipeline.empty() && pipeline.back()->mayUseConnection())
-        return;
+    SBuf errorUri;
+#if USE_OPENSSL
+    bool bumpAborted = (bumpingState > Ssl::bumpStateNone) && (bumpingState < Ssl::bumpStateTlsEstablish);
+    if (bumpAborted) {
+        errorUri.append("Error-bump-aborted:").append(Ssl::BumpingStateStr(bumpingState));
+    } else
+#endif
+    {
+        // a request currently using this connection is responsible for logging
+        if (!pipeline.empty() && pipeline.back()->mayUseConnection())
+            return;
 
-    /* Either we are waiting for the very first transaction, or
-     * we are done with the Nth transaction and are waiting for N+1st.
-     * XXX: We assume that if anything was added to inBuf, then it could
-     * only be consumed by actions already covered by the above checks.
-     */
+        /* Either we are waiting for the very first transaction, or
+         * we are done with the Nth transaction and are waiting for N+1st.
+         * XXX: We assume that if anything was added to inBuf, then it could
+         * only be consumed by actions already covered by the above checks.
+         */
 
-    // do not log connections that closed after a transaction (it is normal)
-    // TODO: access_log needs ACLs to match received-no-bytes connections
-    if (pipeline.nrequests && inBuf.isEmpty())
-        return;
+        // do not log connections that closed after a transaction (it is normal)
+        // TODO: access_log needs ACLs to match received-no-bytes connections
+        if (pipeline.nrequests && inBuf.isEmpty())
+            return;
 
-    /* Create a temporary ClientHttpRequest object. Its destructor will log. */
-    ClientHttpRequest http(this);
-    http.req_sz = inBuf.length();
-    // XXX: Or we died while waiting for the pinned connection to become idle.
-    http.setErrorUri("error:transaction-end-before-headers");
+        errorUri.append("error:transaction-end-before-headers");
+    }
+
+    Http::Stream *stream = abortRequestParsing(errorUri.c_str());
+    stream->registerWithConn();
+    return;
 }
 
 bool

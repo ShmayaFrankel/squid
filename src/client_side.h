@@ -44,6 +44,7 @@ typedef RefCount<MasterXaction> MasterXactionPointer;
 namespace Ssl
 {
 class ServerBump;
+enum BumpingStates: short;
 }
 #endif
 
@@ -269,6 +270,8 @@ public:
     /// for SQUID_X509_V_ERR_DOMAIN_MISMATCH on bumped requests.
     bool serveDelayedError(Http::Stream *);
 
+    void tlsEstablished(); ///< Update current state after TLS connection established
+
     Ssl::BumpMode sslBumpMode; ///< ssl_bump decision (Ssl::bumpEnd if n/a).
 
     /// Tls parser to use for client HELLO messages parsing on bumped
@@ -397,7 +400,9 @@ private:
 
 #if USE_OPENSSL
     bool switchedToHttps_;
-    bool parsingTlsHandshake; ///< whether we are getting/parsing TLS Hello bytes
+    bool parsingTlsHandshake(); ///< whether we are getting/parsing TLS Hello bytes
+
+    Ssl::BumpingStates bumpingState;
 
     /// The SSL server host name appears in CONNECT request or the server ip address for the intercepted requests
     String sslConnectHostOrIp; ///< The SSL server host name as passed in the CONNECT request
