@@ -2184,7 +2184,6 @@ ConnStateData::ConnStateData(const MasterXaction::Pointer &xact) :
 #endif
     needProxyProtocolHeader_(false),
 #if USE_OPENSSL
-    switchedToHttps_(false),
     bumpingState(Ssl::bumpStateNone),
     tlsConnectPort(0),
     sslServerBump(NULL),
@@ -2911,7 +2910,6 @@ ConnStateData::getSslContextDone(Security::ContextPointer &ctx)
                                      this, ConnStateData::requestTimeout);
     commSetConnTimeout(clientConnection, Config.Timeout.request, timeoutCall);
 
-    switchedToHttps_ = true;
     bumpingState = Ssl::bumpStateTlsNegotiate;
 
     auto ssl = fd_table[clientConnection->fd].ssl.get();
@@ -2925,7 +2923,7 @@ ConnStateData::getSslContextDone(Security::ContextPointer &ctx)
 void
 ConnStateData::switchToHttps(ClientHttpRequest *http, Ssl::BumpMode bumpServerMode)
 {
-    assert(!switchedToHttps_);
+    assert(!switchedToHttps());
     Must(http->request);
     auto &request = http->request;
 
@@ -3137,8 +3135,6 @@ ConnStateData::startPeekAndSplice()
     if (!httpsCreate(this, unConfiguredCTX))
         return;
 
-    switchedToHttps_ = true;
-
     auto ssl = fd_table[clientConnection->fd].ssl.get();
     BIO *b = SSL_get_rbio(ssl);
     Ssl::ClientBio *bio = static_cast<Ssl::ClientBio *>(BIO_get_data(b));
@@ -3180,7 +3176,6 @@ ConnStateData::doPeekAndSpliceStep()
     bio->hold(false);
 
     Comm::SetSelect(clientConnection->fd, COMM_SELECT_WRITE, clientNegotiateSSL, this, 0);
-    switchedToHttps_ = true;
     bumpingState = Ssl::bumpStateTlsNegotiate;
 }
 
@@ -3198,6 +3193,12 @@ ConnStateData::httpsPeeked(PinnedIdleContext pic)
         debugs(33, 5, HERE << "Error while bumping: " << sslConnectHostOrIp);
 
     getSslContextStart();
+}
+
+bool
+ConnStateData::switchedToHttps() const
+{
+    return bumpingState == Ssl::bumpStateTlsEstablish;
 }
 
 inline bool

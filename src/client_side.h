@@ -250,7 +250,7 @@ public:
 
     void switchToHttps(ClientHttpRequest *, Ssl::BumpMode bumpServerMode);
     void parseTlsHandshake();
-    bool switchedToHttps() const { return switchedToHttps_; }
+    bool switchedToHttps() const;
     Ssl::ServerBump *serverBump() {return sslServerBump;}
     inline void setServerBump(Ssl::ServerBump *srvBump) {
         if (!sslServerBump)
@@ -399,7 +399,6 @@ private:
     Http1::RequestParserPointer parser_;
 
 #if USE_OPENSSL
-    bool switchedToHttps_;
     bool parsingTlsHandshake(); ///< whether we are getting/parsing TLS Hello bytes
 
     Ssl::BumpingStates bumpingState;
