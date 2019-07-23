@@ -2960,7 +2960,6 @@ ConnStateData::switchToHttps(ClientHttpRequest *http, Ssl::BumpMode bumpServerMo
     // a bumbed "connect" request on non transparent port.
     receivedFirstByte_ = false;
     // Get more data to peek at Tls
-    //parsingTlsHandshake = true;
     bumpingState = Ssl::bumpStateExpectTlsHandshake;
     readSomeData();
 }
@@ -2989,8 +2988,6 @@ ConnStateData::parseTlsHandshake()
         debugs(83, 2, "error on FD " << clientConnection->fd << ": " << ex.what());
         unsupportedProtocol = true;
     }
-
-    // parsingTlsHandshake = false;
 
     // client data may be needed for splicing and for
     // tunneling unsupportedProtocol after an error
