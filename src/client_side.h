@@ -377,6 +377,8 @@ private:
     /// Attempts to add a given TLS context to the cache, replacing the old
     /// same-key context, if any
     void storeTlsContextToCache(const SBuf &cacheKey, Security::ContextPointer &ctx);
+
+    bool peekAtServerSucced(); ///< \return true if the TLS server peeked
 #endif
 
     /// whether PROXY protocol header is still expected

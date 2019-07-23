@@ -2710,8 +2710,7 @@ void ConnStateData::buildSslCertGenerationParams(Ssl::CertificateProperties &cer
 {
     certProperties.commonName =  sslCommonName_.isEmpty() ? sslConnectHostOrIp.termedBuf() : sslCommonName_.c_str();
 
-    const bool connectedOk = sslServerBump && sslServerBump->connectedOk();
-    if (connectedOk) {
+    if (peekAtServerSucced()) {
         if (X509 *mimicCert = sslServerBump->serverCert.get())
             certProperties.mimicCert.resetAndLock(mimicCert);
 
@@ -3204,6 +3203,17 @@ ConnStateData::tlsEstablished()
 {
     if (bumpingState)
         bumpingState = Ssl::bumpStateTlsEstablish;
+}
+
+inline bool
+ConnStateData::peekAtServerSucced()
+{
+    if (!sslServerBump)
+        return false;
+    Must(sslServerBump->entry);
+    // if peeking at server aborted the sslServerBump->entry
+    // contains an error page.
+    return sslServerBump->entry->isEmpty();
 }
 
 #endif /* USE_OPENSSL */
