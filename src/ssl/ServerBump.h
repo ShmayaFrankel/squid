@@ -58,7 +58,7 @@ private:
     store_client *sc; ///< dummy client to prevent entry trimming
 };
 
-enum BumpingStates: short
+enum BumpingStates
 {
     bumpStateNone,
     bumpStateExpectTlsHandshake, ///< Before the client hello message received.

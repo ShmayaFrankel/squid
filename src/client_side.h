@@ -26,6 +26,7 @@
 #endif
 #if USE_OPENSSL
 #include "security/Handshake.h"
+#include "ssl/ServerBump.h"
 #include "ssl/support.h"
 #endif
 #if USE_DELAY_POOLS
@@ -39,14 +40,6 @@ class HttpHdrRangeSpec;
 
 class MasterXaction;
 typedef RefCount<MasterXaction> MasterXactionPointer;
-
-#if USE_OPENSSL
-namespace Ssl
-{
-class ServerBump;
-enum BumpingStates: short;
-}
-#endif
 
 /**
  * Legacy Server code managing a connection to a client.
@@ -250,7 +243,9 @@ public:
 
     void switchToHttps(ClientHttpRequest *, Ssl::BumpMode bumpServerMode);
     void parseTlsHandshake();
-    bool switchedToHttps() const;
+
+    /// \return true after the connection switched to TLS (because of bumping)
+    bool switchedToHttps() const { return bumpingState == Ssl::bumpStateTlsEstablish; }
     Ssl::ServerBump *serverBump() {return sslServerBump;}
     inline void setServerBump(Ssl::ServerBump *srvBump) {
         if (!sslServerBump)
@@ -401,7 +396,7 @@ private:
 #if USE_OPENSSL
     bool parsingTlsHandshake(); ///< whether we are getting/parsing TLS Hello bytes
 
-    Ssl::BumpingStates bumpingState;
+    Ssl::BumpingStates bumpingState; ///< the current bumping state
 
     /// The SSL server host name appears in CONNECT request or the server ip address for the intercepted requests
     String sslConnectHostOrIp; ///< The SSL server host name as passed in the CONNECT request

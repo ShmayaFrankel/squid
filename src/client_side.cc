@@ -3195,12 +3195,6 @@ ConnStateData::httpsPeeked(PinnedIdleContext pic)
     getSslContextStart();
 }
 
-bool
-ConnStateData::switchedToHttps() const
-{
-    return bumpingState == Ssl::bumpStateTlsEstablish;
-}
-
 inline bool
 ConnStateData::parsingTlsHandshake()
 {
