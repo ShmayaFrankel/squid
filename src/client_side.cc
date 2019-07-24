@@ -2146,8 +2146,11 @@ ConnStateData::requestTimeout(const CommTimeoutCbParams &io)
         HttpRequest::Pointer request = context->http->request;
         if (clientTunnelOnError(this, context, request, HttpRequestMethod(), ERR_REQUEST_START_TIMEOUT)) {
 #if USE_OPENSSL
-            if (bumpingState)
+            if (bumpingState) {
+                sslBumpMode = Ssl::bumpSplice;
+                context->http->al->ssl.bumpMode = Ssl::bumpSplice;
                 peekedConnectionSpliced();
+            }
 #endif
             return;
         }
@@ -3009,12 +3012,14 @@ ConnStateData::parseTlsHandshake()
         Must(context && context->http);
         HttpRequest::Pointer request = context->http->request;
         debugs(83, 5, "Got something other than TLS Client Hello. Cannot SslBump.");
-        sslBumpMode = Ssl::bumpSplice;
-        context->http->al->ssl.bumpMode = Ssl::bumpSplice;
+
         if (!clientTunnelOnError(this, context, request, HttpRequestMethod(), ERR_PROTOCOL_UNKNOWN))
             clientConnection->close();
-        else
+        else {
+            sslBumpMode = Ssl::bumpSplice;
+            context->http->al->ssl.bumpMode = Ssl::bumpSplice;
             peekedConnectionSpliced();
+        }
         return;
     }
 
@@ -3147,8 +3152,11 @@ ConnStateData::startPeekAndSplice()
         HttpRequest::Pointer request(http ? http->request : nullptr);
         if (!clientTunnelOnError(this, context, request, HttpRequestMethod(), ERR_SECURE_ACCEPT_FAIL))
             clientConnection->close();
-        else
+        else {
+            sslBumpMode = Ssl::bumpSplice;
+            context->http->al->ssl.bumpMode = Ssl::bumpSplice;
             peekedConnectionSpliced();
+        }
         return;
     }
 
