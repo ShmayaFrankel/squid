@@ -14,6 +14,7 @@
 #include "CachePeer.h"
 #include "cbdata.h"
 #include "client_side.h"
+#include "client_side_reply.h"
 #include "client_side_request.h"
 #include "clients/HttpTunneler.h"
 #include "comm.h"
@@ -1156,6 +1157,7 @@ TunnelStateData::Connection::setDelayId(DelayId const &newDelay)
 #endif
 
 #if USE_OPENSSL
+// TODO: remove it and use a variant of ConnStateData::splice instead
 void
 switchToTunnel(HttpRequest *request, Comm::ConnectionPointer &clientConn, Comm::ConnectionPointer &srvConn)
 {
@@ -1167,12 +1169,16 @@ switchToTunnel(HttpRequest *request, Comm::ConnectionPointer &clientConn, Comm::
 
     auto conn = request->clientConnectionManager.get();
     Must(conn);
-    Http::StreamPointer context = conn->pipeline.front();
-    Must(context && context->http);
 
-    debugs(26, 3, request->method << " " << context->http->uri << " " << request->http_ver);
+    // Build a new ClientHttpRequest for logging purposes
+    const SBuf empty;
+    SBuf hostname(request->url.host());
+    auto http = conn->buildFakeRequest(request->method.id(), hostname, request->url.port(), empty);
+    http->al->ssl.bumpMode = Ssl::bumpSplice;
 
-    TunnelStateData *tunnelState = new TunnelStateData(context->http);
+    debugs(26, 3, request->method << " " << http->uri << " " << request->http_ver);
+
+    TunnelStateData *tunnelState = new TunnelStateData(http);
 
     // tunnelStartShoveling() drains any buffered from-client data (inBuf)
     fd_table[clientConn->fd].useDefaultIo();
@@ -1184,7 +1190,7 @@ switchToTunnel(HttpRequest *request, Comm::ConnectionPointer &clientConn, Comm::
 #if USE_DELAY_POOLS
     /* no point using the delayIsNoDelay stuff since tunnel is nice and simple */
     if (!srvConn->getPeer() || !srvConn->getPeer()->options.no_delay)
-        tunnelState->server.setDelayId(DelayId::DelayClient(context->http));
+        tunnelState->server.setDelayId(DelayId::DelayClient(http));
 #endif
 
     request->peer_host = srvConn->getPeer() ? srvConn->getPeer()->host : nullptr;
