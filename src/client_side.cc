@@ -2147,7 +2147,7 @@ ConnStateData::requestTimeout(const CommTimeoutCbParams &io)
         if (clientTunnelOnError(this, context, request, HttpRequestMethod(), ERR_REQUEST_START_TIMEOUT)) {
 #if USE_OPENSSL
             if (bumpingState)
-                bumpingState = Ssl::bumpStateNone;
+                peekedConnectionSpliced();
 #endif
             return;
         }
@@ -3014,7 +3014,7 @@ ConnStateData::parseTlsHandshake()
         if (!clientTunnelOnError(this, context, request, HttpRequestMethod(), ERR_PROTOCOL_UNKNOWN))
             clientConnection->close();
         else
-            bumpingState = Ssl::bumpStateNone;
+            peekedConnectionSpliced();
         return;
     }
 
@@ -3068,6 +3068,7 @@ ConnStateData::splice()
 {
     // normally we can splice here, because we just got client hello message
 
+    peekedConnectionSpliced();
     // fde::ssl/tls_read_method() probably reads from our own inBuf. If so, then
     // we should not lose any raw bytes when switching to raw I/O here.
     if (fd_table[clientConnection->fd].ssl.get())
@@ -3147,7 +3148,7 @@ ConnStateData::startPeekAndSplice()
         if (!clientTunnelOnError(this, context, request, HttpRequestMethod(), ERR_SECURE_ACCEPT_FAIL))
             clientConnection->close();
         else
-            bumpingState = Ssl::bumpStateNone;
+            peekedConnectionSpliced();
         return;
     }
 

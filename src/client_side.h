@@ -266,6 +266,8 @@ public:
     bool serveDelayedError(Http::Stream *);
 
     void tlsEstablished(); ///< Update current state after TLS connection established
+     /// Update current state after bumped connection spliced
+    void peekedConnectionSpliced() { bumpingState = Ssl::bumpStateNone; }
 
     Ssl::BumpMode sslBumpMode; ///< ssl_bump decision (Ssl::bumpEnd if n/a).
 

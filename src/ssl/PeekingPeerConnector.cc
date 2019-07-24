@@ -245,6 +245,7 @@ Ssl::PeekingPeerConnector::noteNegotiationDone(ErrorState *error)
     if (!error) {
         serverCertificateVerified();
         if (splice) {
+            request->clientConnectionManager->peekedConnectionSpliced();
             switchToTunnel(request.getRaw(), clientConn, serverConn);
             tunnelInsteadOfNegotiating();
         }
