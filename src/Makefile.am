@@ -1532,6 +1532,7 @@ tests_testStore_SOURCES = \
 	tests/stub_client_side_request.cc \
 	tests/stub_comm.cc \
 	tests/stub_debug.cc \
+	err_detail_type.cc \
 	tests/stub_errorpage.cc \
 	event.cc \
 	tests/stub_fatal.cc \
@@ -1951,6 +1952,7 @@ tests_test_http_range_SOURCES = \
 	debug.cc \
 	dlink.cc \
 	dlink.h \
+	err_detail_type.cc \
 	errorpage.cc \
 	event.cc \
 	tests/stub_external_acl.cc \
@@ -2186,6 +2188,7 @@ tests_testHttpReply_SOURCES = \
 	cbdata.h \
 	tests/stub_comm.cc \
 	tests/stub_debug.cc \
+	err_detail_type.cc \
 	tests/stub_errorpage.cc \
 	tests/stub_event.cc \
 	tests/stub_fatal.cc \
@@ -2339,6 +2342,7 @@ tests_testHttpRequest_SOURCES = \
 	debug.cc \
 	dlink.cc \
 	dlink.h \
+	err_detail_type.cc \
 	errorpage.cc \
 	event.cc \
 	external_acl.cc \
@@ -2642,6 +2646,7 @@ tests_testCacheManager_SOURCES = \
 	debug.cc \
 	dlink.cc \
 	dlink.h \
+	err_detail_type.cc \
 	errorpage.cc \
 	event.cc \
 	external_acl.cc \
@@ -2962,6 +2967,7 @@ tests_testEvent_SOURCES = \
 	debug.cc \
 	dlink.cc \
 	dlink.h \
+	err_detail_type.cc \
 	errorpage.cc \
 	event.cc \
 	external_acl.cc \
@@ -3201,6 +3207,7 @@ tests_testEventLoop_SOURCES = \
 	debug.cc \
 	dlink.cc \
 	dlink.h \
+	err_detail_type.cc \
 	errorpage.cc \
 	event.cc \
 	external_acl.cc \
