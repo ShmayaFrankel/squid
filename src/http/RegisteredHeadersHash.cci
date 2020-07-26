@@ -265,7 +265,7 @@ static const struct HeaderTableRecord HttpHeaderDefinitionsTable[] =
 #line 94 "RegisteredHeadersHash.gperf"
     {"Vary", Http::HdrType::VARY, Http::HdrFieldType::ftStr, HdrKind::ListHeader|HdrKind::ReplyHeader},
 #line 75 "RegisteredHeadersHash.gperf"
-    {"Proxy-Authorization", Http::HdrType::PROXY_AUTHORIZATION, Http::HdrFieldType::ftStr, HdrKind::RequestHeader|HdrKind::HopByHopHeader},
+    {"Proxy-Authorization", Http::HdrType::PROXY_AUTHORIZATION, Http::HdrFieldType::ftStr, HdrKind::RequestHeader|HdrKind::RequestHeader},
 #line 106 "RegisteredHeadersHash.gperf"
     {"Surrogate-Control", Http::HdrType::SURROGATE_CONTROL, Http::HdrFieldType::ftPSc, HdrKind::ListHeader|HdrKind::ReplyHeader},
 #line 100 "RegisteredHeadersHash.gperf"
